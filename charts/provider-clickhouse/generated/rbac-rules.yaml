@@ -1,0 +1,56 @@
+- apiGroups:
+    - ""
+  resources:
+    - configmaps
+    - persistentvolumeclaims
+    - services
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - ""
+  resources:
+    - endpoints
+    - pods
+    - secrets
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
+    - apps
+  resources:
+    - statefulsets
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
+    - clickhouse.altinity.com
+  resources:
+    - clickhouseinstallations
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - clickhouse.altinity.com
+  resources:
+    - clickhouseinstallations/finalizers
+  verbs:
+    - update
+- apiGroups:
+    - clickhouse.altinity.com
+  resources:
+    - clickhouseinstallations/status
+  verbs:
+    - get

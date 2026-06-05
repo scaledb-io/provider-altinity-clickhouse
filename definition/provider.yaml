@@ -1,0 +1,9 @@
+# Provider identity and component definitions.
+# This file defines the provider name and maps logical component names
+# to their component types (defined in versions.yaml).
+
+name: provider-clickhouse
+
+components:
+  engine:
+    type: clickhouse

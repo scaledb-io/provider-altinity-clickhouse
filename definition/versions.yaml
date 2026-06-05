@@ -1,0 +1,31 @@
+# Component type version catalog.
+# Tracks supported ClickHouse releases.
+# Exactly one version per type must be marked `default: true`.
+#
+# Images: official ClickHouse Docker Hub image (clickhouse/clickhouse-server).
+# LTS releases are preferred for production; latest is available for testing.
+
+componentTypes:
+  clickhouse:
+    versions:
+    - version: "25.3.5"
+      image: clickhouse/clickhouse-server:25.3.5
+      default: true
+    - version: "25.5.2"
+      image: clickhouse/clickhouse-server:25.5.2
+    - version: "24.8.14"
+      image: clickhouse/clickhouse-server:24.8.14
+
+# Version bundles: curated sets of compatible component versions.
+# Users set spec.version to a bundle name; the runtime resolves per-component versions.
+versions:
+- name: "25.3"
+  default: true
+  components:
+    engine: "25.3.5"
+- name: "25.5"
+  components:
+    engine: "25.5.2"
+- name: "24.8"
+  components:
+    engine: "24.8.14"

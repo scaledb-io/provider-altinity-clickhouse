@@ -1,0 +1,101 @@
+# Standalone topology: single-node ClickHouse instance.
+# No replication, no ZooKeeper/Keeper required.
+# Suitable for development, analytics workloads, and non-HA production.
+
+config:
+  components:
+    engine: {}
+
+ui:
+  sections:
+    databaseVersion:
+      label: "Database Version"
+      description: "Select the ClickHouse version to deploy."
+      components:
+        version:
+          uiType: select
+          path: spec.version
+          fieldParams:
+            label: "ClickHouse Version"
+            optionsPath: spec.versions
+            optionsPathConfig:
+              labelPath: "name"
+              valuePath: "name"
+            modes:
+              edit:
+                disabled: true
+          validation:
+            required: true
+
+    resources:
+      label: "Resources"
+      description: "Configure compute resources and storage for the ClickHouse instance."
+      components:
+        compute:
+          uiType: group
+          groupType: line
+          components:
+            cpu:
+              uiType: number
+              path: spec.components.engine.resources.limits.cpu
+              fieldParams:
+                label: "CPU"
+                defaultValue: 1
+                step: 1
+              validation:
+                required: true
+                min: 1
+            memory:
+              uiType: number
+              path: spec.components.engine.resources.limits.memory
+              fieldParams:
+                label: "Memory"
+                defaultValue: 4
+                step: 1
+                badge: "Gi"
+                badgeToApi: true
+              validation:
+                required: true
+                min: 1
+            disk:
+              uiType: number
+              path: spec.components.engine.storage.size
+              fieldParams:
+                label: "Disk"
+                defaultValue: 25
+                badge: "Gi"
+                badgeToApi: true
+              validation:
+                required: true
+                int: true
+                min: 1
+                modes:
+                  edit:
+                    celExpressions:
+                      - celExpr: "spec.components.engine.storage.size >= original.spec.components.engine.storage.size"
+                        message: "Disk size cannot be decreased"
+          componentsOrder:
+            - cpu
+            - memory
+            - disk
+
+    advanced:
+      label: "Advanced"
+      description: "Optional advanced settings."
+      components:
+        storageClass:
+          uiType: select
+          path: spec.components.engine.storage.storageClass
+          fieldParams:
+            label: "Storage class"
+            displayEmpty: true
+            modes:
+              edit:
+                disabled: true
+          dataSource:
+            provider: storageClasses
+
+  sectionsOrder:
+    - databaseVersion
+    - resources
+    - advanced
