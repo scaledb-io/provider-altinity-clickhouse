@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "provider-clickhouse.fullname" . }}
+  name: {{ include "provider-altinity-clickhouse.fullname" . }}
   labels:
-    {{- include "provider-clickhouse.labels" . | nindent 4 }}
+    {{- include "provider-altinity-clickhouse.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "provider-clickhouse.selectorLabels" . | nindent 6 }}
+      {{- include "provider-altinity-clickhouse.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -16,7 +16,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "provider-clickhouse.labels" . | nindent 8 }}
+        {{- include "provider-altinity-clickhouse.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -25,14 +25,14 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "provider-clickhouse.serviceAccountName" . }}
+      serviceAccountName: {{ include "provider-altinity-clickhouse.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: provider
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: {{ include "provider-clickhouse.image" . }}
+          image: {{ include "provider-altinity-clickhouse.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http

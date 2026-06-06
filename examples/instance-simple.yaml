@@ -4,7 +4,7 @@ kind: Instance
 metadata:
   name: my-database-simple
 spec:
-  provider: provider-clickhouse
+  provider: provider-altinity-clickhouse
   components:
     engine:
       type: 

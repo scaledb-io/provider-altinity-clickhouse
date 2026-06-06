@@ -28,7 +28,7 @@ import (
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	"github.com/openeverest/openeverest/v2/provider-runtime/controller"
 
-	"github.com/scaledb-io/provider-clickhouse/internal/common"
+	"github.com/scaledb-io/provider-altinity-clickhouse/internal/common"
 )
 
 // Compile-time check.

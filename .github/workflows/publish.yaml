@@ -19,7 +19,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/provider-clickhouse-dev
+  IMAGE_NAME: ${{ github.repository_owner }}/provider-altinity-clickhouse-dev
 
 jobs:
   prepare:
@@ -75,7 +75,7 @@ jobs:
       - name: Prepare Helm chart
         if: matrix.platform == 'linux/amd64'
         run: |
-          cd charts/provider-clickhouse
+          cd charts/provider-altinity-clickhouse
           VERSION=${{ needs.prepare.outputs.version }} make release-dev
           cp -r . ${{ runner.temp }}/helm-chart
 

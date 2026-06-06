@@ -13,8 +13,8 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/scaledb-io
-  PROVIDER_IMAGE_NAME: provider-clickhouse
-  PROVIDER_DEV_IMAGE_NAME: provider-clickhouse-dev
+  PROVIDER_IMAGE_NAME: provider-altinity-clickhouse
+  PROVIDER_DEV_IMAGE_NAME: provider-altinity-clickhouse-dev
 
 jobs:
   build:
@@ -166,13 +166,13 @@ jobs:
       - name: Prepare RC chart
         if: env.IS_RC == 'true'
         run: |
-          cd charts/provider-clickhouse
+          cd charts/provider-altinity-clickhouse
           VERSION=${{ env.VERSION }} make release-dev
 
       - name: Prepare release chart
         if: env.IS_RC == 'false'
         run: |
-          cd charts/provider-clickhouse
+          cd charts/provider-altinity-clickhouse
           VERSION=${{ env.VERSION }} make release
 
       - name: Release chart

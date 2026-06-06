@@ -1,11 +1,11 @@
-# Default values for provider-clickhouse.
+# Default values for provider-altinity-clickhouse.
 
 # -- Number of replicas for the provider deployment
 replicaCount: 1
 
 image:
   # -- Container image repository
-  repository: ghcr.io/openeverest/provider-clickhouse-dev
+  repository: ghcr.io/openeverest/provider-altinity-clickhouse-dev
   # -- Image pull policy
   pullPolicy: IfNotPresent
   # -- Overrides the image tag whose default is the chart appVersion
@@ -99,7 +99,7 @@ affinity: {}
 
 provider:
   # -- The name to register for the Provider custom resource
-  name: provider-clickhouse
+  name: provider-altinity-clickhouse
 
 # -- Additional environment variables to set on the provider container
 extraEnv: []

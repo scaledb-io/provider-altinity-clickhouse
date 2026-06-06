@@ -4,7 +4,7 @@ package common
 const (
 	// ProviderName is the canonical name of this provider.
 	// Must match the Provider CR name registered in OpenEverest.
-	ProviderName = "provider-clickhouse"
+	ProviderName = "provider-altinity-clickhouse"
 
 	// ComponentEngine is the logical name of the ClickHouse engine component.
 	ComponentEngine = "engine"

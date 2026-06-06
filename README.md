@@ -1,4 +1,4 @@
-# provider-clickhouse
+# provider-altinity-clickhouse
 
 An [OpenEverest](https://github.com/openeverest) provider for [ClickHouse](https://clickhouse.com),
 built on the [Altinity Kubernetes Operator for ClickHouse](https://github.com/Altinity/clickhouse-operator).
@@ -103,7 +103,7 @@ definition/
 config/
   rbac/
     role.yaml              # Generated ClusterRole (do not edit manually)
-charts/provider-clickhouse/     # Helm chart for deployment
+charts/provider-altinity-clickhouse/     # Helm chart for deployment
   generated/
     rbac-rules.yaml        # Generated RBAC rules (do not edit manually)
     provider-spec.yaml     # Generated Provider CR spec (do not edit manually)
@@ -147,13 +147,13 @@ replace github.com/imdario/mergo => github.com/sunsingerus/mergo v0.3.12
 
 ```bash
 # Install
-helm install provider-clickhouse charts/provider-clickhouse/ --create-namespace
+helm install provider-altinity-clickhouse charts/provider-altinity-clickhouse/ --create-namespace
 
 # Upgrade
-helm upgrade provider-clickhouse charts/provider-clickhouse/
+helm upgrade provider-altinity-clickhouse charts/provider-altinity-clickhouse/
 
 # Uninstall
-helm uninstall provider-clickhouse
+helm uninstall provider-altinity-clickhouse
 ```
 
 ### Local Development (k3d)

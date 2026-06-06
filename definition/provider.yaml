@@ -2,7 +2,7 @@
 # This file defines the provider name and maps logical component names
 # to their component types (defined in versions.yaml).
 
-name: provider-clickhouse
+name: provider-altinity-clickhouse
 
 components:
   engine:
