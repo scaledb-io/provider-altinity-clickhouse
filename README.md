@@ -1,15 +1,68 @@
 # provider-clickhouse
 
-An [OpenEverest](https://github.com/openeverest) provider.
-
-> **New to provider development?** See `github.com/openeverest/provider-sdk/blob/main/PROVIDER_DEVELOPMENT.md` for a complete guide.
+An [OpenEverest](https://github.com/openeverest) provider for [ClickHouse](https://clickhouse.com),
+built on the [Altinity Kubernetes Operator for ClickHouse](https://github.com/Altinity/clickhouse-operator).
 
 ## Prerequisites
 
 - Go 1.26+
-- A Kubernetes cluster (k3d, kind, or remote)
-- [OpenEverest CRDs](https://github.com/openeverest/openeverest) installed
-- Your operator installed and running
+- Kubernetes cluster (k3d, kind, or remote)
+- [OpenEverest](https://github.com/openeverest/openeverest) installed
+- [Altinity ClickHouse Operator](https://github.com/Altinity/clickhouse-operator) installed
+
+```bash
+helm repo add altinity https://docs.altinity.com/clickhouse-operator/
+helm install clickhouse-operator altinity/clickhouse-operator \
+  --namespace clickhouse-system --create-namespace
+```
+
+> **k3d / kind users:** The Altinity operator uses inotify heavily. The default
+> `fs.inotify.max_user_instances=128` causes silent reconciliation failures.
+> Bump it before installing:
+> ```bash
+> echo "fs.inotify.max_user_instances = 8192" | sudo tee /etc/sysctl.d/99-k8s.conf
+> sudo sysctl --system
+> ```
+
+> **Multi-namespace setups:** By default the Altinity operator only watches its
+> own namespace. To watch additional namespaces, set `watchNamespaces` at install
+> time (requires [Altinity operator PR #2007](https://github.com/Altinity/clickhouse-operator/pull/2007)
+> or patch the ConfigMap manually):
+> ```bash
+> helm install clickhouse-operator altinity/clickhouse-operator \
+>   --set "watchNamespaces={clickhouse-system,everest-dev}"
+> ```
+
+## Supported Topologies
+
+| Topology     | Description                                              | Status       |
+|--------------|----------------------------------------------------------|--------------|
+| `standalone` | Single-node ClickHouse, no ZooKeeper                     | ✅ Available |
+| `replicated` | Multi-replica with ClickHouse Keeper (3-node Raft quorum)| ✅ Available |
+
+### standalone
+
+Single ClickHouse node. No coordination dependency. Suitable for development,
+analytics workloads, and read-heavy pipelines (e.g. CDC sinks).
+
+### replicated
+
+Multi-replica ClickHouse with built-in [ClickHouse Keeper](https://clickhouse.com/docs/en/guides/sre/keeper/clickhouse-keeper)
+for distributed coordination. No ZooKeeper required.
+
+Architecture:
+- **ClickHouseKeeperInstallation (CHK):** 3 replicas, Raft quorum — always provisioned automatically
+- **ClickHouseInstallation (CHI):** configurable replicas (minimum 2), single shard
+
+Supports `ReplicatedMergeTree` and all replicated table engines.
+
+## Supported Versions
+
+| Version | Type   | Default |
+|---------|--------|---------|
+| `25.3`  | LTS    | ✅ Yes  |
+| `24.8`  | LTS    |         |
+| `25.5`  | Latest |         |
 
 ## Quick Start
 
@@ -17,10 +70,10 @@ An [OpenEverest](https://github.com/openeverest) provider.
 # Generate all manifests (RBAC, provider spec, Helm chart)
 make generate
 
-# Run the provider locally (for development)
+# Run the provider locally against your cluster
 make run
 
-# Or deploy with Helm
+# Or deploy via Helm
 make helm-install
 ```
 
@@ -43,9 +96,10 @@ definition/
   components/
     types.go               # Component custom spec types
   topologies/
-    <topology>/
-      topology.yaml        # Topology config + UI schema
-      types.go             # Topology-specific config types
+    standalone/
+      topology.yaml        # Single-node topology config + UI schema
+    replicated/
+      topology.yaml        # Multi-replica topology config + UI schema
 config/
   rbac/
     role.yaml              # Generated ClusterRole (do not edit manually)
@@ -53,16 +107,12 @@ charts/provider-clickhouse/     # Helm chart for deployment
   generated/
     rbac-rules.yaml        # Generated RBAC rules (do not edit manually)
     provider-spec.yaml     # Generated Provider CR spec (do not edit manually)
-  templates/               # Helm templates
 examples/
-  instance-example.yaml    # Example Instance CR
-  instance-simple.yaml     # Minimal Instance CR
+  instance-example.yaml    # Example Instance CR (replicated)
+  instance-simple.yaml     # Minimal Instance CR (standalone)
 dev/
   k3d_config.yaml          # Local k3d cluster config
-hack/                      # Helper scripts
-gen.go                     # go:generate entry point
 Makefile                   # Build, generate, and deploy targets
-Dockerfile
 ```
 
 ### Make Targets
@@ -80,7 +130,16 @@ Dockerfile
 | `make verify`           | Check generated files are up-to-date (CI)                  |
 | `make lint`             | Run golangci-lint                                          |
 
-> For development patterns (RBAC, watches, code generation), see [PROVIDER_DEVELOPMENT.md](https://github.com/openeverest/provider-sdk/blob/main/PROVIDER_DEVELOPMENT.md).
+> For development patterns (RBAC, watches, code generation), see
+> [PROVIDER_DEVELOPMENT.md](https://github.com/openeverest/provider-sdk/blob/main/PROVIDER_DEVELOPMENT.md).
+
+### Known Gotcha — mergo replace directive
+
+The Altinity operator depends on a fork of mergo. Add this to `go.mod`:
+
+```
+replace github.com/imdario/mergo => github.com/sunsingerus/mergo v0.3.12
+```
 
 ## Deployment
 
@@ -97,7 +156,7 @@ helm upgrade provider-clickhouse charts/provider-clickhouse/
 helm uninstall provider-clickhouse
 ```
 
-### Local Development
+### Local Development (k3d)
 
 ```bash
 # Create a local k3d cluster
@@ -112,6 +171,12 @@ make test-integration
 # Tear down the cluster
 make k3d-cluster-down
 ```
+
+## Related
+
+- [openeverest/openeverest#1763](https://github.com/openeverest/openeverest/issues/1763) — ClickHouse support tracking issue
+- [openeverest/openeverest#2339](https://github.com/openeverest/openeverest/issues/2339) — chproxy managed proxy support
+- [Altinity/clickhouse-operator#2007](https://github.com/Altinity/clickhouse-operator/pull/2007) — Helm watchNamespaces fix
 
 ## License
 
