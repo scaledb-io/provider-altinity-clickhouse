@@ -2,7 +2,7 @@ HELM ?= helm
 
 # values to override
 IMAGE_PREFIX ?= ghcr.io/scaledb-io
-PROVIDER_IMAGE_NAME ?= provider-clickhouse
+PROVIDER_IMAGE_NAME ?= provider-altinity-clickhouse
 VERSION ?= 0.1.0
 CHART_VERSION ?= $(VERSION)
 
@@ -17,7 +17,7 @@ prepare-chart:
 release: prepare-chart
 
 .PHONY: release-dev
-release-dev: PROVIDER_IMAGE_NAME := provider-clickhouse-dev
+release-dev: PROVIDER_IMAGE_NAME := provider-altinity-clickhouse-dev
 release-dev: prepare-chart
 
 .PHONY: deps
