@@ -29,5 +29,5 @@ Thumbs.db
 .docker/
 
 # Helm chart dependencies (downloaded by `helm dep up`)
-charts/provider-clickhouse/charts/
-charts/provider-clickhouse/Chart.lock
+charts/provider-altinity-clickhouse/charts/
+charts/provider-altinity-clickhouse/Chart.lock

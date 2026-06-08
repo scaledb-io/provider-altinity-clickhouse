@@ -7,7 +7,7 @@ $(LOCALBIN):
 CONTAINER_TOOL ?= docker
 
 # Image URL to use for building/pushing image targets
-IMG ?= ghcr.io/openeverest/provider-clickhouse-dev:latest
+IMG ?= ghcr.io/scaledb-io/provider-altinity-clickhouse-dev:latest
 
 # controller-gen version
 CONTROLLER_TOOLS_VERSION ?= v0.18.0
@@ -22,7 +22,7 @@ GOLANGCI_LINT_VERSION ?= v1.63.4
 GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint-$(GOLANGCI_LINT_VERSION)
 
 # Helm chart directory
-CHART_DIR ?= charts/provider-clickhouse
+CHART_DIR ?= charts/provider-altinity-clickhouse
 
 .PHONY: help
 help: ## Display this help.
@@ -88,19 +88,19 @@ docker-push: ## Push docker image.
 
 .PHONY: helm-install
 helm-install: ## Install the provider using Helm.
-	helm install provider-clickhouse $(CHART_DIR) --create-namespace
+	helm install provider-altinity-clickhouse $(CHART_DIR) --create-namespace
 
 .PHONY: helm-upgrade
 helm-upgrade: ## Upgrade the provider using Helm.
-	helm upgrade provider-clickhouse $(CHART_DIR)
+	helm upgrade provider-altinity-clickhouse $(CHART_DIR)
 
 .PHONY: helm-uninstall
 helm-uninstall: ## Uninstall the provider using Helm.
-	helm uninstall provider-clickhouse
+	helm uninstall provider-altinity-clickhouse
 
 .PHONY: helm-template
 helm-template: ## Render Helm chart templates locally (dry-run).
-	helm template provider-clickhouse $(CHART_DIR)
+	helm template provider-altinity-clickhouse $(CHART_DIR)
 
 ##@ Testing
 
