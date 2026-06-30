@@ -10,15 +10,9 @@ built on the [Altinity Kubernetes Operator for ClickHouse](https://github.com/Al
 - [OpenEverest](https://github.com/openeverest/openeverest) installed
 
 The [Altinity ClickHouse Operator](https://github.com/Altinity/clickhouse-operator)
-is bundled as a Helm dependency and installed automatically with the provider
-chart — no separate install step is required. If the operator already runs on
-your cluster (it is cluster-scoped and manages CRDs cluster-wide), disable the
-bundled copy to avoid conflicts:
-
-```bash
-helm install provider-altinity-clickhouse charts/provider-altinity-clickhouse/ \
-  --set clickhouse-operator.enabled=false
-```
+ships as a bundled Helm dependency (subchart) and is installed automatically with
+the provider chart — no separate install step is required. The operator chart
+manages its own CRDs via pre-install/pre-upgrade hooks.
 
 > **k3d / kind users:** The Altinity operator uses inotify heavily. The default
 > `fs.inotify.max_user_instances=128` causes silent reconciliation failures.
@@ -26,14 +20,6 @@ helm install provider-altinity-clickhouse charts/provider-altinity-clickhouse/ \
 > ```bash
 > echo "fs.inotify.max_user_instances = 8192" | sudo tee /etc/sysctl.d/99-k8s.conf
 > sudo sysctl --system
-> ```
-
-> **Multi-namespace setups:** By default the operator only watches its own
-> namespace. To watch additional namespaces, set the subchart value at install
-> time:
-> ```bash
-> helm install provider-altinity-clickhouse charts/provider-altinity-clickhouse/ \
->   --set "clickhouse-operator.watchNamespaces={clickhouse-system,everest-dev}"
 > ```
 
 ## Supported Topologies

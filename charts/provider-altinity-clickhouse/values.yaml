@@ -117,16 +117,8 @@ leaderElection:
   # -- Enable leader election (recommended for HA deployments)
   enabled: true
 
-# Altinity ClickHouse operator (bundled subchart).
-# The provider manages the operator so the cluster is installable out of the box.
-clickhouse-operator:
-  # -- Install the Altinity ClickHouse operator alongside the provider.
-  # Set to false if the operator is already installed cluster-wide — it is
-  # cluster-scoped and manages CRDs, so running two copies will conflict.
-  enabled: true
-  # CRDs are installed/updated automatically via the operator chart's
-  # pre-install/pre-upgrade hooks (upstream crdHook.enabled=true).
-  # -- Namespaces the operator watches. Empty = the operator's own namespace.
-  # Set explicitly to scope across namespaces, e.g.:
-  #   watchNamespaces: [clickhouse-system, everest-dev]
-  # watchNamespaces: []
+# The Altinity ClickHouse operator is bundled as a subchart (alias "operator",
+# see Chart.yaml dependencies) and runs with its upstream defaults. CRDs are
+# installed/updated automatically via the operator chart's pre-install/pre-upgrade
+# hooks. To override operator settings, add an "operator:" block here keyed to the
+# altinity-clickhouse-operator chart values.

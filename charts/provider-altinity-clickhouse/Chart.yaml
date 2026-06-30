@@ -14,12 +14,9 @@ sources:
 maintainers:
   - name: OpenEverest Contributors
 # The provider owns the operator lifecycle: the Altinity ClickHouse operator
-# ships as a bundled subchart so the provider is installable out of the box.
-# Gated behind clickhouse-operator.enabled so it can be turned off when the
-# operator is already present cluster-wide (it is cluster-scoped + manages CRDs).
+# ships as a bundled subchart so the provider installs out of the box.
 dependencies:
   - name: altinity-clickhouse-operator
-    alias: clickhouse-operator
+    alias: operator
     version: "0.27.1"
-    repository: https://docs.altinity.com/clickhouse-operator/
-    condition: clickhouse-operator.enabled
+    repository: https://helm.altinity.com/
