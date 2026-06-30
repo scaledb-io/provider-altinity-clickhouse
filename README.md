@@ -8,12 +8,16 @@ built on the [Altinity Kubernetes Operator for ClickHouse](https://github.com/Al
 - Go 1.26+
 - Kubernetes cluster (k3d, kind, or remote)
 - [OpenEverest](https://github.com/openeverest/openeverest) installed
-- [Altinity ClickHouse Operator](https://github.com/Altinity/clickhouse-operator) installed
+
+The [Altinity ClickHouse Operator](https://github.com/Altinity/clickhouse-operator)
+is bundled as a Helm dependency and installed automatically with the provider
+chart — no separate install step is required. If the operator already runs on
+your cluster (it is cluster-scoped and manages CRDs cluster-wide), disable the
+bundled copy to avoid conflicts:
 
 ```bash
-helm repo add altinity https://docs.altinity.com/clickhouse-operator/
-helm install clickhouse-operator altinity/clickhouse-operator \
-  --namespace clickhouse-system --create-namespace
+helm install provider-altinity-clickhouse charts/provider-altinity-clickhouse/ \
+  --set clickhouse-operator.enabled=false
 ```
 
 > **k3d / kind users:** The Altinity operator uses inotify heavily. The default
@@ -24,13 +28,12 @@ helm install clickhouse-operator altinity/clickhouse-operator \
 > sudo sysctl --system
 > ```
 
-> **Multi-namespace setups:** By default the Altinity operator only watches its
-> own namespace. To watch additional namespaces, set `watchNamespaces` at install
-> time (requires [Altinity operator PR #2007](https://github.com/Altinity/clickhouse-operator/pull/2007)
-> or patch the ConfigMap manually):
+> **Multi-namespace setups:** By default the operator only watches its own
+> namespace. To watch additional namespaces, set the subchart value at install
+> time:
 > ```bash
-> helm install clickhouse-operator altinity/clickhouse-operator \
->   --set "watchNamespaces={clickhouse-system,everest-dev}"
+> helm install provider-altinity-clickhouse charts/provider-altinity-clickhouse/ \
+>   --set "clickhouse-operator.watchNamespaces={clickhouse-system,everest-dev}"
 > ```
 
 ## Supported Topologies
