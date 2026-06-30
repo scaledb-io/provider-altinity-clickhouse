@@ -8,13 +8,11 @@ built on the [Altinity Kubernetes Operator for ClickHouse](https://github.com/Al
 - Go 1.26+
 - Kubernetes cluster (k3d, kind, or remote)
 - [OpenEverest](https://github.com/openeverest/openeverest) installed
-- [Altinity ClickHouse Operator](https://github.com/Altinity/clickhouse-operator) installed
 
-```bash
-helm repo add altinity https://docs.altinity.com/clickhouse-operator/
-helm install clickhouse-operator altinity/clickhouse-operator \
-  --namespace clickhouse-system --create-namespace
-```
+The [Altinity ClickHouse Operator](https://github.com/Altinity/clickhouse-operator)
+ships as a bundled Helm dependency (subchart) and is installed automatically with
+the provider chart — no separate install step is required. The operator chart
+manages its own CRDs via pre-install/pre-upgrade hooks.
 
 > **k3d / kind users:** The Altinity operator uses inotify heavily. The default
 > `fs.inotify.max_user_instances=128` causes silent reconciliation failures.
@@ -22,15 +20,6 @@ helm install clickhouse-operator altinity/clickhouse-operator \
 > ```bash
 > echo "fs.inotify.max_user_instances = 8192" | sudo tee /etc/sysctl.d/99-k8s.conf
 > sudo sysctl --system
-> ```
-
-> **Multi-namespace setups:** By default the Altinity operator only watches its
-> own namespace. To watch additional namespaces, set `watchNamespaces` at install
-> time (requires [Altinity operator PR #2007](https://github.com/Altinity/clickhouse-operator/pull/2007)
-> or patch the ConfigMap manually):
-> ```bash
-> helm install clickhouse-operator altinity/clickhouse-operator \
->   --set "watchNamespaces={clickhouse-system,everest-dev}"
 > ```
 
 ## Supported Topologies

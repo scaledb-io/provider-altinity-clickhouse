@@ -117,8 +117,8 @@ leaderElection:
   # -- Enable leader election (recommended for HA deployments)
   enabled: true
 
-# TODO: Add values for your operator subchart dependency, e.g.:
-# my-operator:
-#   replicaCount: 1
-#   rbac:
-#     create: true
+# The Altinity ClickHouse operator is bundled as a subchart (alias "operator",
+# see Chart.yaml dependencies) and runs with its upstream defaults. CRDs are
+# installed/updated automatically via the operator chart's pre-install/pre-upgrade
+# hooks. To override operator settings, add an "operator:" block here keyed to the
+# altinity-clickhouse-operator chart values.

@@ -13,8 +13,10 @@ sources:
   - https://github.com/openeverest/provider-altinity-clickhouse
 maintainers:
   - name: OpenEverest Contributors
-# TODO: If your provider depends on an operator Helm chart, add it here.
-# dependencies:
-#   - name: my-operator
-#     version: "1.0.0"
-#     repository: https://example.com/helm-charts/
+# The provider owns the operator lifecycle: the Altinity ClickHouse operator
+# ships as a bundled subchart so the provider installs out of the box.
+dependencies:
+  - name: altinity-clickhouse-operator
+    alias: operator
+    version: "0.27.1"
+    repository: https://helm.altinity.com/
