@@ -96,9 +96,18 @@ func (p *Provider) Validate(c *controller.Context) error {
 	// prior replicated state by the presence of the instance's Keeper CR.
 	if c.Instance().GetTopologyType() == common.TopologyStandalone {
 		chk := &chkv1.ClickHouseKeeperInstallation{}
-		if err := c.Get(chk, keeperCRName(c.Name())); err == nil {
+		err := c.Get(chk, keeperCRName(c.Name()))
+		switch {
+		case err == nil:
+			// The Keeper exists, so this is a replicated instance being
+			// downgraded to standalone.
 			return fmt.Errorf("cannot downgrade a replicated instance to standalone: " +
 				"delete and recreate the instance instead")
+		case !controller.IsNotFound(err):
+			// Fail closed on API server/RBAC/network errors. Treating an
+			// unknown error as "no Keeper" would let a destructive downgrade
+			// through while the cluster is unhealthy.
+			return fmt.Errorf("checking for existing Keeper during standalone validation: %w", err)
 		}
 	}
 
@@ -347,11 +356,15 @@ func (p *Provider) Cleanup(c *controller.Context) error {
 		return fmt.Errorf("delete ClickHouseInstallation: %w", err)
 	}
 
-	if c.Instance().GetTopologyType() == common.TopologyReplicated {
-		chk := &chkv1.ClickHouseKeeperInstallation{ObjectMeta: c.ObjectMeta(keeperCRName(c.Name()))}
-		if err := c.Delete(chk); err != nil {
-			return fmt.Errorf("delete ClickHouseKeeperInstallation: %w", err)
-		}
+	// Always attempt to delete the Keeper, regardless of the Instance's current
+	// topology label. A replicated instance that is edited back toward standalone,
+	// or an Instance deleted during a provider outage, can leave the topology
+	// reading "standalone" while a migrated Keeper still exists — gating the
+	// deletion on the label here would orphan it. c.Delete ignores NotFound, so
+	// this is a harmless no-op for an instance that never had a Keeper.
+	chk := &chkv1.ClickHouseKeeperInstallation{ObjectMeta: c.ObjectMeta(keeperCRName(c.Name()))}
+	if err := c.Delete(chk); err != nil {
+		return fmt.Errorf("delete ClickHouseKeeperInstallation: %w", err)
 	}
 
 	l.Info("ClickHouse instance cleaned up", "name", c.Name())
