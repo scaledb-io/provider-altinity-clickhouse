@@ -1,0 +1,6 @@
+# In the standalone phase there must be NO Keeper provisioned yet.
+apiVersion: clickhouse-keeper.altinity.com/v1
+kind: ClickHouseKeeperInstallation
+metadata:
+  name: itest-ch-keeper
+  namespace: default

@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"time"
 
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chkv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -86,6 +86,19 @@ func (p *Provider) Validate(c *controller.Context) error {
 	if c.Instance().GetTopologyType() == common.TopologyReplicated {
 		if engine.Replicas != nil && *engine.Replicas < 2 {
 			return fmt.Errorf("replicated topology requires at least 2 engine replicas")
+		}
+	}
+
+	// Guard against a replicated -> standalone downgrade. Removing the Keeper
+	// and dropping replicas from a running replicated cluster is destructive
+	// (loss of HA, and data loss on ReplicatedMergeTree tables), so we reject
+	// it. A downgrade must be done by recreating the Instance. We detect the
+	// prior replicated state by the presence of the instance's Keeper CR.
+	if c.Instance().GetTopologyType() == common.TopologyStandalone {
+		chk := &chkv1.ClickHouseKeeperInstallation{}
+		if err := c.Get(chk, keeperCRName(c.Name())); err == nil {
+			return fmt.Errorf("cannot downgrade a replicated instance to standalone: " +
+				"delete and recreate the instance instead")
 		}
 	}
 
@@ -167,7 +180,86 @@ func (p *Provider) syncReplicated(c *controller.Context) error {
 		return controller.WaitForDuration("waiting for Altinity operator to provision ClickHouseInstallation", 15*time.Second)
 	}
 
+	// 3b. Migration path: an existing CHI provisioned as standalone (no Keeper
+	// wiring, single replica) is reconfigured in place to the replicated shape.
+	// This is the ONLY case where we mutate an existing CHI — steady state stays
+	// create-only. The patch is idempotent and guarded, so once the operator has
+	// converged (Keeper wired + replicas scaled) we stop touching the CHI.
+	//
+	// Existing table DATA is intentionally NOT migrated here: non-replicated
+	// MergeTree tables stay single-replica until a DBA converts them to
+	// ReplicatedMergeTree and backfills. See MIGRATION.md.
+	if chiNeedsReplicatedMigration(existingCHI, replicas) {
+		migrateCHIToReplicated(existingCHI, buildZookeeperConfig(c), replicas)
+		if applyErr := c.Apply(existingCHI); applyErr != nil {
+			return fmt.Errorf("migrate ClickHouseInstallation to replicated: %w", applyErr)
+		}
+		l.Info("Migrating ClickHouseInstallation standalone->replicated",
+			"name", c.Name(), "replicas", replicas)
+		return controller.WaitForDuration("waiting for operator to apply replicated topology", 15*time.Second)
+	}
+
 	return waitForCHI(c, existingCHI)
+}
+
+// chiNeedsReplicatedMigration reports whether an existing CHI still has the
+// standalone shape — no Keeper/ZooKeeper wiring, or fewer replicas than
+// desired — and therefore must be reconfigured for the replicated topology.
+func chiNeedsReplicatedMigration(chi *chiv1.ClickHouseInstallation, targetReplicas int) bool {
+	if chi.Spec.Configuration == nil {
+		return true
+	}
+	if chi.Spec.Configuration.Zookeeper == nil || len(chi.Spec.Configuration.Zookeeper.Nodes) == 0 {
+		return true
+	}
+	return chiReplicaCount(chi) < targetReplicas
+}
+
+// chiReplicaCount returns the replica count of the CHI's first cluster,
+// defaulting to 1 when the layout is not set.
+func chiReplicaCount(chi *chiv1.ClickHouseInstallation) int {
+	if chi.Spec.Configuration == nil || len(chi.Spec.Configuration.Clusters) == 0 {
+		return 1
+	}
+	layout := chi.Spec.Configuration.Clusters[0].Layout
+	if layout == nil || layout.ReplicasCount == 0 {
+		return 1
+	}
+	return layout.ReplicasCount
+}
+
+// migrateCHIToReplicated mutates an existing CHI in place to the replicated
+// shape: wires ClickHouse Keeper (ZooKeeper node list) and scales the cluster
+// to the target replica count. Only the fields we own are touched, so
+// operator-managed spec fields are preserved. Kept free of *controller.Context
+// so it is unit-testable.
+func migrateCHIToReplicated(chi *chiv1.ClickHouseInstallation, zk *chiv1.ZookeeperConfig, replicas int) {
+	if chi.Spec.Configuration == nil {
+		chi.Spec.Configuration = &chiv1.Configuration{}
+	}
+	chi.Spec.Configuration.Zookeeper = zk
+
+	if len(chi.Spec.Configuration.Clusters) == 0 {
+		// Defensive: rebuild the cluster layout if somehow absent.
+		chi.Spec.Configuration.Clusters = []*chiv1.Cluster{{
+			Name:   common.CHIClusterName,
+			Layout: &chiv1.ChiClusterLayout{ShardsCount: 1, ReplicasCount: replicas},
+			Templates: &chiv1.TemplatesList{
+				PodTemplate:             common.PodTemplateName,
+				DataVolumeClaimTemplate: common.DataVolumeClaimTemplateName,
+			},
+		}}
+		return
+	}
+
+	cl := chi.Spec.Configuration.Clusters[0]
+	if cl.Layout == nil {
+		cl.Layout = &chiv1.ChiClusterLayout{}
+	}
+	cl.Layout.ReplicasCount = replicas
+	if cl.Layout.ShardsCount == 0 {
+		cl.Layout.ShardsCount = 1
+	}
 }
 
 // waitForCHI checks CHI status and returns a WaitError if not yet Completed.
@@ -325,12 +417,7 @@ func buildCHI(c *controller.Context, replicasCount int) (*chiv1.ClickHouseInstal
 	// We enumerate them for the ZooKeeper config so older operator versions
 	// (which may not support the keeper: reference field) work correctly.
 	if replicasCount > 1 {
-		nodes := keeperZookeeperNodes(keeperCRName(c.Name()), c.Namespace(), common.KeeperReplicas)
-		spec.Configuration.Zookeeper = &chiv1.ZookeeperConfig{
-			Nodes:              nodes,
-			SessionTimeoutMs:   30000,
-			OperationTimeoutMs: 10000,
-		}
+		spec.Configuration.Zookeeper = buildZookeeperConfig(c)
 	}
 
 	return &chiv1.ClickHouseInstallation{
@@ -402,6 +489,18 @@ func buildCHK(c *controller.Context) *chkv1.ClickHouseKeeperInstallation {
 // keeperCRName returns the CHK resource name for a given instance.
 func keeperCRName(instanceName string) string {
 	return instanceName + "-keeper"
+}
+
+// buildZookeeperConfig returns the ZooKeeper/Keeper client config that points
+// the ClickHouse cluster at this instance's ClickHouseKeeperInstallation.
+// Shared by the create path (buildCHI) and the standalone->replicated
+// migration path so both stay in sync.
+func buildZookeeperConfig(c *controller.Context) *chiv1.ZookeeperConfig {
+	return &chiv1.ZookeeperConfig{
+		Nodes:              keeperZookeeperNodes(keeperCRName(c.Name()), c.Namespace(), common.KeeperReplicas),
+		SessionTimeoutMs:   30000,
+		OperationTimeoutMs: 10000,
+	}
 }
 
 // keeperZookeeperNodes builds the explicit ZooKeeper node list for Keeper.

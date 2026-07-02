@@ -1,0 +1,44 @@
+# Step 2: prove the migrated cluster actually replicates. Create a
+# ReplicatedMergeTree table on one replica, insert a row, and confirm it
+# appears on another replica. This validates the Keeper wiring end-to-end.
+#
+# NOTE: kuttl runs command scripts with /bin/sh (dash on Debian), so this must
+# be POSIX sh — no bash arrays, mapfile, or `set -o pipefail`.
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |
+      set -eu
+      NS="${TEST_NAMESPACE:-default}"
+      CHI="${TEST_INSTANCE:-itest-ch}"
+
+      # Discover the ClickHouse replica pods for this CHI (newline-separated).
+      PODS=$(kubectl get pods -n "$NS" \
+        -l "clickhouse.altinity.com/chi=$CHI" \
+        -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort)
+      P0=$(echo "$PODS" | sed -n 1p)
+      P1=$(echo "$PODS" | sed -n 2p)
+      if [ -z "$P1" ]; then
+        echo "expected >=2 ClickHouse replica pods, got: $PODS"
+        exit 1
+      fi
+      echo "replica-0=$P0 replica-1=$P1"
+
+      # ON CLUSTER propagates the DDL to every replica; the {shard}/{replica}
+      # macros are injected per-pod by the Altinity operator.
+      kubectl exec -n "$NS" "$P0" -c clickhouse -- clickhouse-client -q \
+        "CREATE TABLE IF NOT EXISTS default.itest_repl ON CLUSTER '{cluster}' (id UInt64) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/itest_repl', '{replica}') ORDER BY id"
+      kubectl exec -n "$NS" "$P0" -c clickhouse -- clickhouse-client -q \
+        "INSERT INTO default.itest_repl VALUES (42)"
+
+      # Poll replica-1 until the row replicates (or time out).
+      i=0
+      while [ "$i" -lt 30 ]; do
+        n=$(kubectl exec -n "$NS" "$P1" -c clickhouse -- clickhouse-client -q \
+          "SELECT count() FROM default.itest_repl" 2>/dev/null || echo 0)
+        if [ "$n" = "1" ]; then echo "replication OK on $P1"; exit 0; fi
+        i=$((i + 1))
+        sleep 5
+      done
+      echo "row did not replicate to $P1 within timeout"
+      exit 1

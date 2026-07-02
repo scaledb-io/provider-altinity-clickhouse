@@ -45,6 +45,14 @@ Architecture:
 
 Supports `ReplicatedMergeTree` and all replicated table engines.
 
+### Migrating standalone → replicated
+
+An existing `standalone` Instance can be migrated in place to `replicated`
+(the provider provisions the Keeper and reconfigures the ClickHouse cluster —
+no recreation). Existing non-replicated table **data is not migrated
+automatically**; that conversion is a DBA operation. `replicated → standalone`
+downgrade is intentionally blocked. See [MIGRATION.md](MIGRATION.md).
+
 ## Supported Versions
 
 | Version | Type   | Default |

@@ -1,0 +1,22 @@
+# Step 1: migrate the SAME Instance standalone -> replicated (replicas: 2).
+# The provider must provision the Keeper and reconfigure the existing CHI in
+# place (no recreation).
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: itest-ch
+  namespace: default
+spec:
+  provider: altinity-clickhouse
+  topology:
+    type: replicated
+  components:
+    engine:
+      type: clickhouse
+      replicas: 2
+      resources:
+        limits:
+          cpu: "1"
+          memory: 2G
+      storage:
+        size: 10Gi

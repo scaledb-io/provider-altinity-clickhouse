@@ -116,7 +116,7 @@ spec:
                 label: Replicas
                 modes:
                   edit:
-                    disabled: true
+                    disabled: false
                 step: 1
               path: spec.components.engine.replicas
               uiType: number
