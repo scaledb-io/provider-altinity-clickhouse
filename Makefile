@@ -134,7 +134,7 @@ dev-down: ## Stop the Tilt dev environment (keeps the cluster).
 	tilt down -f dev/Tiltfile
 
 .PHONY: dev-destroy
-dev-destroy: k3d-cluster-down ## Stop Tilt and delete the k3d cluster.
+dev-destroy: dev-down k3d-cluster-down ## Stop Tilt and delete the k3d cluster.
 
 ##@ Tool Dependencies
 
