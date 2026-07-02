@@ -65,6 +65,28 @@ func TestChiReplicaCount(t *testing.T) {
 	}
 }
 
+func TestReplicatedScaleDownRequested(t *testing.T) {
+	cases := []struct {
+		name            string
+		current, target int
+		want            bool
+	}{
+		{"scale down 3->2", 3, 2, true},
+		{"scale down 2->1 (defensive)", 2, 1, true},
+		{"no change 2->2", 2, 2, false},
+		{"scale up 2->3", 2, 3, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := replicatedScaleDownRequested(standaloneWithReplicas(tc.current), tc.target)
+			if got != tc.want {
+				t.Fatalf("replicatedScaleDownRequested(current=%d, target=%d) = %v, want %v",
+					tc.current, tc.target, got, tc.want)
+			}
+		})
+	}
+}
+
 func standaloneWithReplicas(n int) *chiv1.ClickHouseInstallation {
 	chi := standaloneCHI()
 	chi.Spec.Configuration.Clusters[0].Layout.ReplicasCount = n

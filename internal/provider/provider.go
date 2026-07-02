@@ -87,6 +87,29 @@ func (p *Provider) Validate(c *controller.Context) error {
 		if engine.Replicas != nil && *engine.Replicas < 2 {
 			return fmt.Errorf("replicated topology requires at least 2 engine replicas")
 		}
+
+		// Reject a silent scale-down. Editing `replicas` down on a running
+		// replicated cluster (e.g. 3 -> 2) passes the min-2 check above, but
+		// Sync's migration guard only fires when the current replica count is
+		// BELOW target — so a decrease would be silently ignored (no scale-down,
+		// no error). Decommissioning a replica is a data operation, not an
+		// in-place infra edit, so we reject it here. See #7.
+		target := replicasCount(c)
+		existingCHI := &chiv1.ClickHouseInstallation{}
+		switch err := c.Get(existingCHI, c.Name()); {
+		case err == nil:
+			if replicatedScaleDownRequested(existingCHI, target) {
+				return fmt.Errorf(
+					"scaling down replicated replicas (%d -> %d) is not supported: "+
+						"decommissioning replicas is a data operation — keep replicas at or above the "+
+						"current count, or delete and recreate the instance",
+					chiReplicaCount(existingCHI), target)
+			}
+		case !controller.IsNotFound(err):
+			// Fail closed on API server/RBAC/network errors rather than letting
+			// an unvalidated change through.
+			return fmt.Errorf("checking existing ClickHouseInstallation during replicated validation: %w", err)
+		}
 	}
 
 	// Guard against a replicated -> standalone downgrade. Removing the Keeper
@@ -222,6 +245,14 @@ func chiNeedsReplicatedMigration(chi *chiv1.ClickHouseInstallation, targetReplic
 		return true
 	}
 	return chiReplicaCount(chi) < targetReplicas
+}
+
+// replicatedScaleDownRequested reports whether target would shrink an existing
+// replicated cluster below its current replica count. Decommissioning replicas
+// is a data operation we intentionally do not perform in place, so callers
+// reject it rather than silently ignoring the change. See #7.
+func replicatedScaleDownRequested(existing *chiv1.ClickHouseInstallation, target int) bool {
+	return chiReplicaCount(existing) > target
 }
 
 // chiReplicaCount returns the replica count of the CHI's first cluster,
