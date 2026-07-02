@@ -11,10 +11,10 @@ kind: Instance
 metadata:
   name: example-instance
 spec:
-  provider: provider-altinity-clickhouse
+  provider: altinity-clickhouse
   components:
     engine:
-      type: 
+      type: clickhouse
       replicas: 1
       resources:
         limits:

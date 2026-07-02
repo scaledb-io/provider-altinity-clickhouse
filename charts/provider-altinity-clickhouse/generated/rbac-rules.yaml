@@ -78,3 +78,35 @@
     - clickhouseinstallations/status
   verbs:
     - get
+- apiGroups:
+    - core.openeverest.io
+  resources:
+    - instances
+  verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - core.openeverest.io
+  resources:
+    - instances/finalizers
+  verbs:
+    - update
+- apiGroups:
+    - core.openeverest.io
+  resources:
+    - instances/status
+  verbs:
+    - get
+    - patch
+    - update
+- apiGroups:
+    - core.openeverest.io
+  resources:
+    - providers
+  verbs:
+    - get
+    - list
+    - watch

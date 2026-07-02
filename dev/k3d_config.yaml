@@ -3,7 +3,8 @@
 apiVersion: k3d.io/v1alpha5
 kind: Simple
 metadata:
-  name: provider-altinity-clickhouse-test
+  # NOTE: k3d cluster names must be <= 32 characters.
+  name: provider-altinity-clickhouse
 servers: 1
 agents: 3
 image: rancher/k3s:v1.33.2-k3s1
