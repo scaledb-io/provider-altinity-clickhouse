@@ -15,6 +15,7 @@
 package provider
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -23,6 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
@@ -222,9 +225,8 @@ func (p *Provider) syncReplicated(c *controller.Context) error {
 	// MergeTree tables stay single-replica until a DBA converts them to
 	// ReplicatedMergeTree and backfills. See MIGRATION.md.
 	if chiNeedsReplicatedMigration(existingCHI, replicas) {
-		migrateCHIToReplicated(existingCHI, buildZookeeperConfig(c), replicas)
-		if applyErr := c.Apply(existingCHI); applyErr != nil {
-			return fmt.Errorf("migrate ClickHouseInstallation to replicated: %w", applyErr)
+		if patchErr := patchCHIReplicatedTopology(c, existingCHI, buildZookeeperConfig(c), replicas); patchErr != nil {
+			return fmt.Errorf("migrate ClickHouseInstallation to replicated: %w", patchErr)
 		}
 		l.Info("Migrating ClickHouseInstallation standalone->replicated",
 			"name", c.Name(), "replicas", replicas)
@@ -268,38 +270,50 @@ func chiReplicaCount(chi *chiv1.ClickHouseInstallation) int {
 	return layout.ReplicasCount
 }
 
-// migrateCHIToReplicated mutates an existing CHI in place to the replicated
-// shape: wires ClickHouse Keeper (ZooKeeper node list) and scales the cluster
-// to the target replica count. Only the fields we own are touched, so
-// operator-managed spec fields are preserved. Kept free of *controller.Context
-// so it is unit-testable.
-func migrateCHIToReplicated(chi *chiv1.ClickHouseInstallation, zk *chiv1.ZookeeperConfig, replicas int) {
-	if chi.Spec.Configuration == nil {
-		chi.Spec.Configuration = &chiv1.Configuration{}
-	}
-	chi.Spec.Configuration.Zookeeper = zk
+// jsonPatchOp is a single RFC 6902 JSON Patch operation.
+type jsonPatchOp struct {
+	Op    string      `json:"op"`
+	Path  string      `json:"path"`
+	Value interface{} `json:"value,omitempty"`
+}
 
-	if len(chi.Spec.Configuration.Clusters) == 0 {
-		// Defensive: rebuild the cluster layout if somehow absent.
-		chi.Spec.Configuration.Clusters = []*chiv1.Cluster{{
-			Name:   common.CHIClusterName,
-			Layout: &chiv1.ChiClusterLayout{ShardsCount: 1, ReplicasCount: replicas},
-			Templates: &chiv1.TemplatesList{
-				PodTemplate:             common.PodTemplateName,
-				DataVolumeClaimTemplate: common.DataVolumeClaimTemplateName,
-			},
-		}}
-		return
+// buildReplicatedMigrationPatch returns the surgical JSON Patch that wires
+// ClickHouse Keeper (ZooKeeper node list) and scales the cluster to the target
+// replica count — and touches nothing else. An "add" on an existing object
+// member replaces its value (and creates it when absent), so it is correct
+// whether or not ZooKeeper was previously wired.
+//
+// This is deliberately NOT a full-object write: the Altinity operator owns and
+// continuously normalizes the CHI, so we only ever assert the two fields we
+// own. Kept free of *controller.Context so it is unit-testable. See #8.
+func buildReplicatedMigrationPatch(chi *chiv1.ClickHouseInstallation, zk *chiv1.ZookeeperConfig, replicas int) ([]jsonPatchOp, error) {
+	if chi.Spec.Configuration == nil ||
+		len(chi.Spec.Configuration.Clusters) == 0 ||
+		chi.Spec.Configuration.Clusters[0] == nil ||
+		chi.Spec.Configuration.Clusters[0].Layout == nil {
+		return nil, fmt.Errorf("CHI %q lacks the expected standalone shape (configuration/clusters[0]/layout); refusing to patch", chi.Name)
 	}
+	return []jsonPatchOp{
+		{Op: "add", Path: "/spec/configuration/zookeeper", Value: zk},
+		{Op: "add", Path: "/spec/configuration/clusters/0/layout/replicasCount", Value: replicas},
+	}, nil
+}
 
-	cl := chi.Spec.Configuration.Clusters[0]
-	if cl.Layout == nil {
-		cl.Layout = &chiv1.ChiClusterLayout{}
+// patchCHIReplicatedTopology applies buildReplicatedMigrationPatch as an RFC
+// 6902 JSON Patch. Unlike a full client.Update off a possibly-stale Get, a
+// targeted JSON Patch (a) carries no resourceVersion, so it cannot conflict
+// with concurrent operator writes, and (b) mutates only the two field paths we
+// own, so operator-normalized spec fields are never clobbered. See #8.
+func patchCHIReplicatedTopology(c *controller.Context, chi *chiv1.ClickHouseInstallation, zk *chiv1.ZookeeperConfig, replicas int) error {
+	ops, err := buildReplicatedMigrationPatch(chi, zk, replicas)
+	if err != nil {
+		return err
 	}
-	cl.Layout.ReplicasCount = replicas
-	if cl.Layout.ShardsCount == 0 {
-		cl.Layout.ShardsCount = 1
+	data, err := json.Marshal(ops)
+	if err != nil {
+		return fmt.Errorf("marshal migration patch: %w", err)
 	}
+	return c.Client().Patch(c.Context(), chi, client.RawPatch(types.JSONPatchType, data))
 }
 
 // waitForCHI checks CHI status and returns a WaitError if not yet Completed.

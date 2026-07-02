@@ -11,7 +11,14 @@ When you change an existing Instance's topology from `standalone` to
 
 1. Provisions a `ClickHouseKeeperInstallation` (CHK) — 3-node Raft quorum — and
    waits for it to become `Completed`.
-2. Reconfigures the existing `ClickHouseInstallation` (CHI) in place:
+2. Reconfigures the existing `ClickHouseInstallation` (CHI) in place via a
+   surgical RFC 6902 JSON Patch that touches only two field paths
+   (`spec.configuration.zookeeper` and
+   `spec.configuration.clusters[0].layout.replicasCount`) — never a full-object
+   write. Because the Altinity operator owns and continuously normalizes the
+   CHI, the provider asserts only the fields it owns and carries no
+   `resourceVersion`, so it cannot clobber operator-managed fields or conflict
+   with concurrent operator writes. The patch:
    - wires the ClickHouse Keeper (ZooKeeper node list) into the CHI configuration;
    - scales the cluster `ReplicasCount` from 1 up to the target replica count.
 3. The Altinity operator rolls the ClickHouse pods, adds the new replica(s), and

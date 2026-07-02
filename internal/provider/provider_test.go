@@ -15,6 +15,7 @@
 package provider
 
 import (
+	"encoding/json"
 	"testing"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -126,38 +127,51 @@ func TestChiNeedsReplicatedMigration(t *testing.T) {
 	}
 }
 
-func TestMigrateCHIToReplicated(t *testing.T) {
-	chi := standaloneCHI()
-	migrateCHIToReplicated(chi, testZK(), 2)
-
-	if chi.Spec.Configuration.Zookeeper == nil || len(chi.Spec.Configuration.Zookeeper.Nodes) == 0 {
-		t.Fatal("expected ZooKeeper to be wired after migration")
+func TestBuildReplicatedMigrationPatch(t *testing.T) {
+	ops, err := buildReplicatedMigrationPatch(standaloneCHI(), testZK(), 3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if got := chiReplicaCount(chi); got != 2 {
-		t.Errorf("expected 2 replicas after migration, got %d", got)
-	}
-	if sc := chi.Spec.Configuration.Clusters[0].Layout.ShardsCount; sc != 1 {
-		t.Errorf("expected shard count preserved at 1, got %d", sc)
+	if len(ops) != 2 {
+		t.Fatalf("expected exactly 2 patch ops, got %d", len(ops))
 	}
 
-	// Migration must be idempotent: a second pass leaves it converged.
-	migrateCHIToReplicated(chi, testZK(), 2)
-	if chiNeedsReplicatedMigration(chi, 2) {
-		t.Error("CHI should be converged after migration")
+	// The whole point of #8: the patch must touch ONLY the two fields we own,
+	// never a full-object write that could clobber operator-normalized spec.
+	allowed := map[string]bool{
+		"/spec/configuration/zookeeper":                       true,
+		"/spec/configuration/clusters/0/layout/replicasCount": true,
+	}
+	for _, op := range ops {
+		if op.Op != "add" {
+			t.Errorf("op for %s = %q, want \"add\"", op.Path, op.Op)
+		}
+		if !allowed[op.Path] {
+			t.Errorf("patch touches unexpected path %q (must only touch zookeeper + replicasCount)", op.Path)
+		}
+	}
+
+	// Must serialize to a valid JSON Patch document.
+	if _, err := json.Marshal(ops); err != nil {
+		t.Fatalf("patch ops not JSON-serializable: %v", err)
 	}
 }
 
-func TestMigrateCHIToReplicatedNilConfiguration(t *testing.T) {
-	chi := &chiv1.ClickHouseInstallation{}
-	migrateCHIToReplicated(chi, testZK(), 3)
-
-	if chi.Spec.Configuration == nil {
-		t.Fatal("expected configuration to be created")
+func TestBuildReplicatedMigrationPatchRejectsMalformedCHI(t *testing.T) {
+	cases := map[string]*chiv1.ClickHouseInstallation{
+		"nil configuration": {},
+		"no clusters": {Spec: chiv1.ChiSpec{
+			Configuration: &chiv1.Configuration{},
+		}},
+		"nil layout": {Spec: chiv1.ChiSpec{
+			Configuration: &chiv1.Configuration{
+				Clusters: []*chiv1.Cluster{{Name: "clickhouse"}},
+			},
+		}},
 	}
-	if len(chi.Spec.Configuration.Clusters) == 0 {
-		t.Fatal("expected a cluster to be created defensively")
-	}
-	if got := chiReplicaCount(chi); got != 3 {
-		t.Errorf("expected 3 replicas, got %d", got)
+	for name, chi := range cases {
+		if _, err := buildReplicatedMigrationPatch(chi, testZK(), 2); err == nil {
+			t.Errorf("%s: expected error, got nil", name)
+		}
 	}
 }
