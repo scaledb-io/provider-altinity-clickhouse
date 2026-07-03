@@ -78,6 +78,14 @@ jobs:
           go install github.com/kudobuilder/kuttl/cmd/kubectl-kuttl@v0.22.0
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
+      # The Altinity operator uses inotify heavily; the runner default of
+      # fs.inotify.max_user_instances=128 causes silent reconciliation
+      # failures on k3d (see README Prerequisites).
+      - name: Bump inotify limits
+        run: |
+          sudo sysctl -w fs.inotify.max_user_instances=8192
+          sudo sysctl -w fs.inotify.max_user_watches=524288
+
       - name: Create k3d cluster
         run: make k3d-cluster-up
 

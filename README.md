@@ -76,6 +76,11 @@ make helm-install
 
 ## Development
 
+> New here? See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup,
+> how to run the unit and integration (kuttl) test suites locally, how CI
+> runs them, and the pull-request conventions (DCO sign-off, copyright
+> headers, generated files).
+
 ### Project Structure
 
 ```
@@ -155,12 +160,18 @@ helm uninstall provider-altinity-clickhouse
 
 ### Local Development (k3d)
 
+The integration (kuttl) suite needs the OpenEverest core + this provider
+running in the cluster, so the local flow brings them up via Tilt before
+testing. See [CONTRIBUTING.md](CONTRIBUTING.md#integration-tests-kuttl-end-to-end)
+for the full walkthrough and [`dev/README.md`](dev/README.md) for the
+interactive Tilt dashboard.
+
 ```bash
 # Create a local k3d cluster
 make k3d-cluster-up
 
-# Run the provider locally against the cluster
-make run
+# Bring up the OpenEverest core + this provider (pin the pre-release core tag)
+OPENEVEREST_VERSION=2.0.0-dev.1 tilt ci -f dev/Tiltfile
 
 # Run integration tests
 make test-integration
