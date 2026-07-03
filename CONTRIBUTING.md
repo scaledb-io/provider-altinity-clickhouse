@@ -7,12 +7,14 @@ This guide covers local development, the test suites, and how CI runs them.
 
 ## Prerequisites
 
-- Go 1.26+
+- Go 1.26+ (the toolchain is pinned to `1.26.3` in `go.mod`; keep the default
+  `GOTOOLCHAIN=auto` so it's fetched automatically, or install `1.26.3` yourself)
 - [Docker](https://docs.docker.com/get-docker/)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/), [Helm](https://helm.sh/docs/intro/install/), [k3d](https://k3d.io/)
 - [Tilt](https://docs.tilt.dev/install.html) (for the local dev stack)
-- [`kubectl-kuttl`](https://kuttl.dev/docs/cli.html) (for integration tests):
-  `go install github.com/kudobuilder/kuttl/cmd/kubectl-kuttl@latest`
+- [`kubectl-kuttl`](https://kuttl.dev/docs/cli.html) (for integration tests) —
+  pin the same version CI uses so a local run matches CI:
+  `go install github.com/kudobuilder/kuttl/cmd/kubectl-kuttl@v0.22.0`
 
 > **k3d / kind users — bump inotify first.** The Altinity operator uses inotify
 > heavily; the default `fs.inotify.max_user_instances=128` causes *silent*
