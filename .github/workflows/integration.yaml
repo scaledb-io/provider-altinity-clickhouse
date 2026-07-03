@@ -1,0 +1,111 @@
+---
+name: Integration
+
+# End-to-end kuttl suite against a real cluster: k3d + the released OpenEverest
+# v2 core + this provider + the bundled Altinity ClickHouse operator.
+#
+# This job is HEAVY (k3d bring-up, image pulls, ClickHouse + Keeper rollout), so
+# it is opt-in only — it never runs on every commit and never on merge. It runs:
+#   - on demand           (workflow_dispatch)
+#   - on pull requests    ONLY when labelled `run-integration`
+#
+# The steps below are exactly the local dev flow, so it reproduces 1:1 on a
+# workstation:
+#   make k3d-cluster-up
+#   tilt ci -f dev/Tiltfile        # (or `make dev-up` for interactive Tilt)
+#   make test-integration
+#   make k3d-cluster-down
+on:
+  workflow_dispatch:
+    inputs:
+      openeverest_version:
+        description: >-
+          OpenEverest core chart version to install (pre-release tags are not
+          picked up by Helm's "latest" resolution, so pin one explicitly).
+        required: false
+        default: "2.0.0-dev.1"
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # While OpenEverest v2 is in pre-release, Helm's "latest" resolution skips the
+  # pre-release tags, so the core version must be pinned. workflow_dispatch can
+  # override this via its input.
+  OPENEVEREST_VERSION: ${{ github.event.inputs.openeverest_version || '2.0.0-dev.1' }}
+  KUTTL_TIMEOUT: "900"
+
+jobs:
+  integration:
+    name: kuttl (k3d)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Skip on PRs unless someone opts in with the `run-integration` label.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+        contains(github.event.pull_request.labels.*.name, 'run-integration'))
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: azure/setup-helm@v4
+
+      - name: Install k3d
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh \
+            | TAG=v5.8.3 bash
+          k3d version
+
+      - name: Install Tilt
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/tilt-dev/tilt/master/scripts/install.sh \
+            | bash
+          tilt version
+
+      - name: Install kuttl
+        run: |
+          go install github.com/kudobuilder/kuttl/cmd/kubectl-kuttl@v0.22.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Create k3d cluster
+        run: make k3d-cluster-up
+
+      - name: Bring up OpenEverest core + provider (tilt ci)
+        run: tilt ci -f dev/Tiltfile
+        env:
+          INSTALL_OPENEVEREST: "true"
+
+      - name: Run integration suite (kuttl)
+        run: make test-integration
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "===== pods (all namespaces) ====="
+          kubectl get pods -A -o wide || true
+          echo "===== instances ====="
+          kubectl get instances -A -o yaml || true
+          echo "===== clickhouseinstallations ====="
+          kubectl get clickhouseinstallations -A -o yaml || true
+          echo "===== clickhousekeeperinstallations ====="
+          kubectl get clickhousekeeperinstallations -A -o yaml || true
+          echo "===== provider logs ====="
+          kubectl logs -l app.kubernetes.io/name=provider-altinity-clickhouse \
+            -A --tail=300 || true
+          echo "===== recent events ====="
+          kubectl get events -A --sort-by=.lastTimestamp | tail -60 || true
+
+      - name: Tear down k3d cluster
+        if: always()
+        run: make k3d-cluster-down || true
