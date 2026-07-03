@@ -137,11 +137,16 @@ Makefile                   # Build, generate, and deploy targets
 
 ### Known Gotcha — mergo replace directive
 
-The Altinity operator depends on a fork of mergo. Add this to `go.mod`:
+The Altinity operator depends on a fork of mergo, so `go.mod` already carries
+a `replace` directive for it:
 
 ```
-replace github.com/imdario/mergo => github.com/sunsingerus/mergo v0.3.12
+replace github.com/imdario/mergo => github.com/sunsingerus/mergo v0.0.0-20230507185449-fc6fffa94450
 ```
+
+Leave it in place — removing it breaks the build against the Altinity operator.
+If you ever bump the operator, keep this `replace` aligned with the fork
+revision the operator expects.
 
 ## Deployment
 
