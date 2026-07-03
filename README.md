@@ -76,6 +76,11 @@ make helm-install
 
 ## Development
 
+> New here? See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup,
+> how to run the unit and integration (kuttl) test suites locally, how CI
+> runs them, and the pull-request conventions (DCO sign-off, copyright
+> headers, generated files).
+
 ### Project Structure
 
 ```
@@ -132,11 +137,16 @@ Makefile                   # Build, generate, and deploy targets
 
 ### Known Gotcha — mergo replace directive
 
-The Altinity operator depends on a fork of mergo. Add this to `go.mod`:
+The Altinity operator depends on a fork of mergo, so `go.mod` already carries
+a `replace` directive for it:
 
 ```
-replace github.com/imdario/mergo => github.com/sunsingerus/mergo v0.3.12
+replace github.com/imdario/mergo => github.com/sunsingerus/mergo v0.0.0-20230507185449-fc6fffa94450
 ```
+
+Leave it in place — removing it breaks the build against the Altinity operator.
+If you ever bump the operator, keep this `replace` aligned with the fork
+revision the operator expects.
 
 ## Deployment
 
@@ -155,12 +165,18 @@ helm uninstall provider-altinity-clickhouse
 
 ### Local Development (k3d)
 
+The integration (kuttl) suite needs the OpenEverest core + this provider
+running in the cluster, so the local flow brings them up via Tilt before
+testing. See [CONTRIBUTING.md](CONTRIBUTING.md#integration-tests-kuttl-end-to-end)
+for the full walkthrough and [`dev/README.md`](dev/README.md) for the
+interactive Tilt dashboard.
+
 ```bash
 # Create a local k3d cluster
 make k3d-cluster-up
 
-# Run the provider locally against the cluster
-make run
+# Bring up the OpenEverest core + this provider (pin the pre-release core tag)
+OPENEVEREST_VERSION=2.0.0-dev.1 tilt ci -f dev/Tiltfile
 
 # Run integration tests
 make test-integration

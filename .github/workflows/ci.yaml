@@ -49,6 +49,26 @@ jobs:
       - name: Compile binary
         run: go build -o /dev/null ./cmd/provider
 
+  unit-test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # -race needs CGO (gcc is preinstalled on ubuntu runners) and
+      # -covermode=atomic, which is required when the race detector is on.
+      - name: Run unit tests
+        run: go test ./... -race -covermode=atomic -coverprofile=cover.out
+
+      - name: Coverage summary
+        run: go tool cover -func=cover.out | tail -1
+
   verify:
     name: Verify generated files
     runs-on: ubuntu-latest
