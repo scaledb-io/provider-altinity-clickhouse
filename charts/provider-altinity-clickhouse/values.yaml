@@ -76,14 +76,14 @@ resources:
 
 livenessProbe:
   httpGet:
-    path: /schema
+    path: /healthz
     port: http
   initialDelaySeconds: 15
   periodSeconds: 20
 
 readinessProbe:
   httpGet:
-    path: /schema
+    path: /readyz
     port: http
   initialDelaySeconds: 5
   periodSeconds: 10
@@ -98,8 +98,10 @@ tolerations: []
 affinity: {}
 
 provider:
-  # -- The name to register for the Provider custom resource
-  name: provider-altinity-clickhouse
+  # -- The name to register for the Provider custom resource.
+  # Must match the Go constant ProviderName in internal/common/spec.go
+  # so the controller's predicate filter and Provider CR lookup agree.
+  name: altinity-clickhouse
 
 # -- Additional environment variables to set on the provider container
 extraEnv: []

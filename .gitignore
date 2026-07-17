@@ -31,3 +31,4 @@ Thumbs.db
 # Helm chart dependencies (downloaded by `helm dep up`)
 charts/provider-altinity-clickhouse/charts/
 charts/provider-altinity-clickhouse/Chart.lock
+dev/.env

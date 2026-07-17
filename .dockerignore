@@ -1,5 +1,7 @@
 # generated binaries
 bin/
+# ...but the dev image (dev/provider.Dockerfile) needs the pre-built binary
+!bin/provider
 # Helm chart dependencies
 charts/
 # test artifacts
