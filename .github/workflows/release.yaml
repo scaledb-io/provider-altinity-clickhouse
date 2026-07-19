@@ -12,7 +12,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/scaledb-io
+  IMAGE_PREFIX: ghcr.io/openeverest
   PROVIDER_IMAGE_NAME: provider-altinity-clickhouse
   PROVIDER_DEV_IMAGE_NAME: provider-altinity-clickhouse-dev
 
@@ -189,14 +189,29 @@ jobs:
       contents: write
     env:
       VERSION: ${{ github.event.inputs.version }}
+      IS_RC: ${{ contains(github.event.inputs.version, '-') }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+        with:
+          ref: main
 
       - name: Configure Git
         run: |
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Update install version in README
+        if: env.IS_RC == 'false'
+        run: |
+          sed -i -E "s/--version [0-9]+\.[0-9]+\.[0-9]+/--version ${VERSION}/g" README.md
+          if git diff --quiet README.md; then
+            echo "README already at version $VERSION, nothing to commit"
+          else
+            git add README.md
+            git commit -m "docs: update install version to v$VERSION"
+            git push origin HEAD:main
+          fi
 
       - name: Create and push tag
         run: |
