@@ -3,7 +3,7 @@ module github.com/scaledb-io/provider-altinity-clickhouse
 go 1.26.3
 
 require (
-	github.com/openeverest/openeverest/v2 v2.0.0-dev.1.0.20260721094553-5da074e3580b
+	github.com/openeverest/openeverest/v2 v2.0.0-dev.1.0.20260721150452-3ea180918896
 	k8s.io/api v0.36.0
 	k8s.io/apimachinery v0.36.0
 	sigs.k8s.io/controller-runtime v0.24.0
@@ -128,7 +128,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oasdiff/yaml v0.0.9 // indirect
 	github.com/oasdiff/yaml3 v0.0.12 // indirect
-	github.com/openeverest/provider-sdk v0.1.0 // indirect
+	github.com/openeverest/provider-sdk v0.1.1-0.20260720192309-4d37ccf4f10e // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
