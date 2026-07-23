@@ -1,0 +1,7 @@
+# Tear down the test Instance (the operator garbage-collects the CHI/CHK).
+# The ephemeral k3d cluster is normally destroyed afterwards via
+# `make k3d-cluster-down`, but this keeps re-runs on a persistent cluster clean.
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - command: kubectl delete instance itest-ch -n default --ignore-not-found --wait=false

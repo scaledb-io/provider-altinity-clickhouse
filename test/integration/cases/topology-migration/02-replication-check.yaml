@@ -1,0 +1,72 @@
+# Step 2: prove the migrated cluster actually replicates. Create a
+# ReplicatedMergeTree table on one replica, insert a row, and confirm it
+# appears on another replica. This validates the Keeper wiring end-to-end.
+#
+# NOTE: kuttl runs command scripts with /bin/sh (dash on Debian), so this must
+# be POSIX sh — no bash arrays, mapfile, or `set -o pipefail`.
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |
+      set -eu
+      NS="${TEST_NAMESPACE:-default}"
+      CHI="${TEST_INSTANCE:-itest-ch}"
+
+      # Discover the ClickHouse replica pods for this CHI (newline-separated).
+      PODS=$(kubectl get pods -n "$NS" \
+        -l "clickhouse.altinity.com/chi=$CHI" \
+        -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | sort)
+      P0=$(echo "$PODS" | sed -n 1p)
+      P1=$(echo "$PODS" | sed -n 2p)
+      if [ -z "$P1" ]; then
+        echo "expected >=2 ClickHouse replica pods, got: $PODS"
+        exit 1
+      fi
+      echo "replica-0=$P0 replica-1=$P1"
+
+      # Bounded retry knobs. When a replica is scaled in during migration, the
+      # Altinity operator adds it to the cluster's remote_servers and reloads
+      # ClickHouse config; that reload lags pod-Ready by a few seconds. Issuing
+      # an ON CLUSTER DDL before replica-1 is in the cluster only creates the
+      # table on replica-0, so we first wait for the cluster to report both
+      # replicas. Every wait loop is capped so the step can never hang.
+      RETRIES=36        # attempts
+      SLEEP=5           # seconds between attempts (36 * 5s = 180s cap per loop)
+
+      # 1. Wait until replica-0 sees BOTH replicas registered in its cluster
+      #    definition (remote_servers reloaded). {cluster} resolves via the
+      #    per-pod macro so we don't hardcode the cluster name.
+      i=0
+      while [ "$i" -lt "$RETRIES" ]; do
+        members=$(kubectl exec -n "$NS" "$P0" -c clickhouse -- clickhouse-client -q \
+          "SELECT count() FROM system.clusters WHERE cluster = (SELECT substitution FROM system.macros WHERE macro = 'cluster')" 2>/dev/null || echo 0)
+        if [ "$members" -ge 2 ] 2>/dev/null; then
+          echo "cluster reports $members replicas — proceeding"
+          break
+        fi
+        i=$((i + 1))
+        if [ "$i" -ge "$RETRIES" ]; then
+          echo "cluster did not register 2 replicas within $((RETRIES * SLEEP))s (saw: $members)"
+          exit 1
+        fi
+        sleep "$SLEEP"
+      done
+
+      # 2. Create the replicated table on every replica. ON CLUSTER now reaches
+      #    both; the {shard}/{replica} macros are injected per-pod by the operator.
+      kubectl exec -n "$NS" "$P0" -c clickhouse -- clickhouse-client -q \
+        "CREATE TABLE IF NOT EXISTS default.itest_repl ON CLUSTER '{cluster}' (id UInt64) ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/itest_repl', '{replica}') ORDER BY id"
+      kubectl exec -n "$NS" "$P0" -c clickhouse -- clickhouse-client -q \
+        "INSERT INTO default.itest_repl VALUES (42)"
+
+      # 3. Poll replica-1 until the row replicates (bounded).
+      i=0
+      while [ "$i" -lt "$RETRIES" ]; do
+        n=$(kubectl exec -n "$NS" "$P1" -c clickhouse -- clickhouse-client -q \
+          "SELECT count() FROM default.itest_repl" 2>/dev/null || echo 0)
+        if [ "$n" = "1" ]; then echo "replication OK on $P1"; exit 0; fi
+        i=$((i + 1))
+        sleep "$SLEEP"
+      done
+      echo "row did not replicate to $P1 within $((RETRIES * SLEEP))s"
+      exit 1

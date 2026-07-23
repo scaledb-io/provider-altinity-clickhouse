@@ -1,0 +1,13 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestSuite
+# Test cases live under cases/. Each subdirectory is one ordered test case.
+testDirs:
+  - test/integration/cases
+# Generous default: ClickHouse + Keeper image pulls and rollout on a cold k3d
+# cluster take a while. Override with KUTTL_TIMEOUT via test/vars.sh.
+timeout: 600
+# Run against an already-provisioned cluster (OpenEverest core + this provider
+# must already be installed, e.g. via `make dev-up`). kuttl does not manage the
+# cluster lifecycle here.
+startKIND: false
+parallel: 1

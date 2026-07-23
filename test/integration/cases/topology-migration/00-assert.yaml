@@ -1,0 +1,13 @@
+# Assert the standalone CHI is provisioned with a single replica.
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: itest-ch
+  namespace: default
+spec:
+  configuration:
+    clusters:
+      - layout:
+          replicasCount: 1
+status:
+  status: Completed

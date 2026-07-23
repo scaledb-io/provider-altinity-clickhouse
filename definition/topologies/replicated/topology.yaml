@@ -42,9 +42,12 @@ ui:
             label: "Replicas"
             defaultValue: 2
             step: 1
+            # Editable on update: allows scaling replicas and supports the
+            # standalone -> replicated topology migration (which sets the
+            # target replica count). Minimum 2 is enforced below.
             modes:
               edit:
-                disabled: true
+                disabled: false
           validation:
             required: true
             min: 2
