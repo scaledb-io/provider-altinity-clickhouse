@@ -147,6 +147,10 @@ helm uninstall provider-altinity-clickhouse
 
 ### Local Development (k3d)
 
+Integration tests use [chainsaw](https://kyverno.github.io/chainsaw/); install it
+with `go install github.com/kyverno/chainsaw@v0.2.15`. See
+[`test/integration/README.md`](test/integration/README.md) for the test cases.
+
 ```bash
 # Create a local k3d cluster
 make k3d-cluster-up
